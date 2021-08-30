@@ -18,3 +18,5 @@ class MessageSerializer(serializers.ModelSerializer):
         data = super(MessageSerializer, self).to_representation(instance)
         data['sender'] = instance.sender.email
         return data
+
+
