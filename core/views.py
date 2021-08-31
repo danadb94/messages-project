@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.decorators import action
-
+from django.contrib.auth.models import User
 
 class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin,
                   mixins.ListModelMixin, generics.RetrieveAPIView, GenericViewSet):
@@ -39,17 +39,32 @@ class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin,
 
         user = self.request.user
         sender = instance.sender
-        receiver = instance.receiver
+        receivers_data = instance.receiver
+
+        receivers = []
+        for receiver in receivers_data.all():
+            receivers.append(receiver.email)
 
         # User send to himself, delete the whole message
-        if user == sender and user == receiver:
+        if user == sender and [user.email] == receivers:
             self.perform_destroy(instance)
         # Delete sender from the message
         elif user == sender:
             instance.sender = None
             instance.save()
+
+        # Delete receiver from the message
         else:
-            instance.receiver = None
+            receivers.remove(user.email)
+
+            # get a list of ids of updated receivers and set them in the message.
+            updated_receivers = User.objects.values_list('id').filter(email__in=receivers)
+            updated_data = []
+            if updated_receivers:
+                for receiver in updated_receivers:
+                    updated_data.append(receiver[0])
+
+            instance.receiver.set(updated_data)
             instance.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
