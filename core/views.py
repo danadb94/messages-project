@@ -33,7 +33,7 @@ class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin,
         serializer = self.get_serializer(message)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-    # Delete selected message only from the logged-in user
+    # Delete selected message only from the logged-in user and not thw whole message
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
 
