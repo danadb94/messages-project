@@ -1,4 +1,4 @@
-from core.models import Message
+from core.models import Message, ReadMessage
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
@@ -31,8 +31,14 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'receiver', 'subject', 'message', 'creation_date', 'read_message', ]
-        read_only_fields = ('sender', 'creation_date', 'read_message', )
+        fields = ['id', 'sender', 'receiver', 'subject', 'message', 'creation_date', ]
+        read_only_fields = ('sender', 'creation_date', )
+
+    # Display sender email instead of user pk
+    def to_representation(self, instance):
+        data = super(MessageSerializer, self).to_representation(instance)
+        data['sender'] = instance.sender.email
+        return data
 
     def create(self, validated_data):
         receivers = validated_data.pop('receiver')
@@ -47,12 +53,21 @@ class MessageSerializer(serializers.ModelSerializer):
 
         message = Message.objects.create(**validated_data)
 
-        # relate receivers to message
+        # relate receivers to message and insert it to read message table
         receivers = User.objects.filter(email__in=receivers_email)
         for receiver in receivers:
             message.receiver.add(receiver.id)
+            ReadMessage.objects.create(receiver=User(id=receiver.id), message=Message(id=message.id))
 
         message.save()
         return message
 
+
+class ReadMessageSerializer(serializers.ModelSerializer):
+    message = MessageSerializer(many=False)
+
+    class Meta:
+        model = ReadMessage
+        fields = ['message', 'read', ]
+        read_only_fields = ('receiver', 'message', 'read', )
 

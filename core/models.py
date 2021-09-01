@@ -8,7 +8,16 @@ class Message(models.Model):
     subject = models.CharField(max_length=100, null=True, blank=True)
     message = models.TextField(null=True, blank=True)
     creation_date = models.DateTimeField(auto_now_add=True)
-    read_message = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'{self.sender.email}- {self.subject}'
+        return f'{self.subject}'
+
+
+class ReadMessage(models.Model):
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, null=True)
+    read = models.BooleanField(default=False)
+    creation_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.message.subject}'
