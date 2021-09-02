@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 
 
 class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin,
-                  mixins.ListModelMixin, generics.RetrieveAPIView, GenericViewSet):
+                  mixins.ListModelMixin, GenericViewSet):
 
     serializer_class = MessageSerializer
     permission_classes = (IsAuthenticated,)
