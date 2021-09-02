@@ -140,7 +140,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5000),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=8),
 }
 
 django_heroku.settings(locals())
