@@ -1,6 +1,7 @@
-For write message, get all messages for a specific user: /messages/
-For get all unread messages for a specific user: unread_messages/
-For read message: unread_messages/ + message id
+For write message: /messages/
+For get all messages for a specific user: user_messages/
+For get all unread messages for a specific user: user_messages/unread_messages/
+For read message: user_messages/ + message id
 For delete message: /messages/ + message id
 
 Assumptions:
