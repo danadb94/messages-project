@@ -1,4 +1,4 @@
-from core.models import Message, ReadMessage
+from core.models import Message, UserMessage
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
@@ -53,21 +53,24 @@ class MessageSerializer(serializers.ModelSerializer):
 
         message = Message.objects.create(**validated_data)
 
-        # relate receivers to message and insert it to read message table
+        # insert sender message to usermessage table
+        UserMessage.objects.create(user=User(id=validated_data.pop('sender').id), message=Message(id=message.id), sender=True)
+
+        # relate receivers to message and insert it to usermessage table
         receivers = User.objects.filter(email__in=receivers_email)
         for receiver in receivers:
             message.receiver.add(receiver.id)
-            ReadMessage.objects.create(receiver=User(id=receiver.id), message=Message(id=message.id))
+            UserMessage.objects.create(user=User(id=receiver.id), message=Message(id=message.id))
 
         message.save()
         return message
 
 
-class ReadMessageSerializer(serializers.ModelSerializer):
+class UserMessageSerializer(serializers.ModelSerializer):
     message = MessageSerializer(many=False)
 
     class Meta:
-        model = ReadMessage
-        fields = ['message', 'read', ]
-        read_only_fields = ('receiver', 'message', 'read', )
+        model = UserMessage
+        fields = ['message', 'read', 'sender', ]
+        read_only_fields = ('user', 'message', 'read', 'sender', )
 

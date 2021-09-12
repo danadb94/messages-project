@@ -13,10 +13,11 @@ class Message(models.Model):
         return f'{self.subject}'
 
 
-class ReadMessage(models.Model):
-    receiver = models.ForeignKey(User, on_delete=models.CASCADE)
+class UserMessage(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.ForeignKey(Message, on_delete=models.CASCADE, null=True)
     read = models.BooleanField(default=False)
+    sender = models.BooleanField(default=False)
     creation_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from core.models import Message,ReadMessage
+from core.models import Message,UserMessage
 
 
 @admin.register(Message)
@@ -8,7 +8,6 @@ class Messageadmin(admin.ModelAdmin):
     autocomplete_fields = ('receiver', )
 
 
-@admin.register(ReadMessage)
-class ReadMessageadmin(admin.ModelAdmin):
-    list_display = ('id', 'receiver', 'message', 'read', )
-
+@admin.register(UserMessage)
+class UserMessageadmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'message', 'read', 'sender', )

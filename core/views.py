@@ -1,27 +1,25 @@
-from core.models import Message, ReadMessage
-from core.serializers import MessageSerializer, ReadMessageSerializer
+from core.models import Message, UserMessage
+from core.serializers import MessageSerializer, UserMessageSerializer
 from django.db.models import Q
 from rest_framework import mixins, status, generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from django.contrib.auth.models import User
+from rest_framework.decorators import action
 
 
-class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin,
-                  mixins.ListModelMixin, GenericViewSet):
+class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin, GenericViewSet):
 
     serializer_class = MessageSerializer
     permission_classes = (IsAuthenticated,)
 
-    # Get messages of only logged-in user, newest messages first.
+    def perform_create(self, serializer):
+        serializer.save(sender=self.request.user)
+
     def get_queryset(self):
         user = self.request.user
         return Message.objects.filter(Q(sender=user) | Q(receiver=user))\
             .order_by("-creation_date").distinct()
-
-    def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
 
     # Delete selected message only from the logged-in user and not thw whole message
     def destroy(self, request, *args, **kwargs):
@@ -35,78 +33,56 @@ class MessageView(mixins.CreateModelMixin, mixins.DestroyModelMixin,
         for receiver in receivers_data.all():
             receivers.append(receiver.email)
 
-        # User send to himself, delete the whole message
+        # User send to himself, delete the whole message and delete relevant rows from UserMessage
         if user == sender and [user.email] == receivers:
             self.perform_destroy(instance)
-        # Delete sender from the message
-        elif user == sender and user.email not in receivers:
-            instance.sender = None
-            instance.save()
+            UserMessage.objects.filter(Q(user=user) & Q(message=instance)).delete()
 
-        # User is receiver
+        # User is receiver/ sender or both (but includes additional receivers),delete relevant rows from UserMessage
         else:
-            # Delete record of receiver-message from ReadMessage for not displaying him it
-            msg_id = self.request.parser_context['kwargs']['pk']
-            read_msg_obj = ReadMessage.objects.get(message=msg_id, receiver=user)
-            read_msg_obj.delete()
+            UserMessage.objects.filter(Q(user=user) & Q(message=instance)).delete()
 
-            # Delete receiver from the message
-            receivers.remove(user.email)
-
-            # Get a list of ids of updated receivers and set them in the message.
-            updated_receivers = User.objects.values_list('id').filter(email__in=receivers)
-            updated_data = []
-            if updated_receivers:
-                for receiver in updated_receivers:
-                    updated_data.append(receiver[0])
-
-            instance.receiver.set(updated_data)
-            # user is also a sender
-            if user == sender:
-                instance.sender = None
-
-            instance.save()
+        instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ReadMessageView(generics.RetrieveAPIView, mixins.ListModelMixin, GenericViewSet):
+class UserMessageView(generics.RetrieveAPIView, mixins.ListModelMixin, GenericViewSet):
 
-    serializer_class = ReadMessageSerializer
+    serializer_class = UserMessageSerializer
     permission_classes = (IsAuthenticated,)
-    queryset = ReadMessage.objects.all()
+    queryset = UserMessage.objects.all()
 
-    # unread message
-    def list(self, request, *args, **kwargs):
-        # Get all unread messages of only logged-in user, messages that the user sent will not be included.
-        queryset = ReadMessage.objects.filter(Q(receiver=self.request.user) & Q(read=False))\
-            .order_by("-creation_date")
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+    # Get messages of only logged-in user, newest messages first.
+    def get_queryset(self):
+        user = self.request.user
+        return UserMessage.objects.filter(user=user).order_by("-creation_date").distinct()
 
     # read message
     def retrieve(self, request, *args, **kwargs):
 
-        # get message id and find it in ReadMessage
+        # get message id and find it in UserMessage. user can read messages he received.
         msg_id = self.request.parser_context['kwargs']['pk']
-        query = ReadMessage.objects.values_list('id').filter(message=msg_id, receiver=self.request.user)
+        query = UserMessage.objects.values_list('id').filter(message=msg_id, user=self.request.user, sender=False)
 
         if query:
             # get read message id and update read field to True
             read_message_id = query[0][0]
-            read_msg_obj = ReadMessage.objects.get(pk=read_message_id)
+            read_msg_obj = UserMessage.objects.get(pk=read_message_id)
             read_msg_obj.read = True
             read_msg_obj.save()
 
-            serializer = ReadMessageSerializer(read_msg_obj)
+            serializer = UserMessageSerializer(read_msg_obj)
             return Response(data=serializer.data, status=status.HTTP_200_OK)
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @action(detail=False)
+    def unread_messages(self, pk=None):
+        # Get all unread messages of only logged-in user, messages that the user sent will not be included.
+        queryset = UserMessage.objects.filter(Q(user=self.request.user) & Q(read=False) & Q(sender=False))\
+            .order_by("-creation_date")
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
